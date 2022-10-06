@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -9,7 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
+	"fmt"
+	"os"
 	"github.com/restic/restic/internal/debug"
 	"github.com/restic/restic/internal/errors"
 )
@@ -68,11 +70,20 @@ func Transport(opts TransportOptions) (http.RoundTripper, error) {
 	// copied from net/http
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// redirect all connections to 127.0.0.1
+			addr = "127.0.0.1" + addr[strings.LastIndex(addr, ":"):]
+			return (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext(ctx, network, addr)
+		},
+		// DialContext: (&net.Dialer{
+		// 	Timeout:   30 * time.Second,
+		// 	KeepAlive: 30 * time.Second,
+		// 	DualStack: true,
+		// }).DialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   100,
@@ -85,7 +96,8 @@ func Transport(opts TransportOptions) (http.RoundTripper, error) {
 	if opts.InsecureTLS {
 		tr.TLSClientConfig.InsecureSkipVerify = true
 	}
-
+        fmt.Fprintf(os.Stderr, "CHRIS TATA\n")
+        //tr.TLSClientConfig
 	if opts.TLSClientCertKeyFilename != "" {
 		certs, key, err := readPEMCertKey(opts.TLSClientCertKeyFilename)
 		if err != nil {
